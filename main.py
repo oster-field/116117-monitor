@@ -1,8 +1,12 @@
 import logging
 import os
 import re
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+
+from dotenv import load_dotenv
+load_dotenv()  # must be before local imports — scraper.py reads HEADLESS at import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import JobLookupError
@@ -16,6 +20,7 @@ from database import (
     get_all_running, set_status, touch_job, remove_job,
 )
 from scraper import check_appointments, build_url
+from email_sender import send_appointment_found
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,13 +30,12 @@ logger = logging.getLogger(__name__)
 
 POLL_MINUTES = int(os.getenv("POLL_INTERVAL_MINUTES", "10"))
 scheduler = AsyncIOScheduler(timezone="Europe/Berlin")
+UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
 
-UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
-
-# ──────────────────────────────────────────────
-# Scheduler helpers
-# ──────────────────────────────────────────────
+# ── Scheduler helpers ────────────────────────────────────────────────────────
 
 def _remove_sched(job_id: str) -> None:
     try:
@@ -42,12 +46,11 @@ def _remove_sched(job_id: str) -> None:
 
 def _add_sched(job_id: str) -> None:
     scheduler.add_job(
-        _poll,
-        "interval",
+        _poll, "interval",
         minutes=POLL_MINUTES,
         id=job_id,
         args=[job_id],
-        next_run_time=datetime.now(timezone.utc),   # run immediately
+        next_run_time=datetime.now(timezone.utc),  # run immediately
         replace_existing=True,
     )
 
@@ -65,6 +68,11 @@ async def _poll(job_id: str) -> None:
         await set_status(job_id, "found", result=msg)
         _remove_sched(job_id)
         logger.info("Job %s → FOUND %d appointments", job_id, result["count"])
+        # Run sync Resend call in a thread — avoids blocking the async event loop
+        await asyncio.to_thread(
+            send_appointment_found,
+            job["email"], result["url"], msg,
+        )
 
     elif result["status"] == "error":
         await set_status(job_id, "error", error=result["message"])
@@ -75,9 +83,7 @@ async def _poll(job_id: str) -> None:
         logger.info("Job %s → 0 appointments, continuing", job_id)
 
 
-# ──────────────────────────────────────────────
-# Lifespan
-# ──────────────────────────────────────────────
+# ── Lifespan ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -90,9 +96,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown(wait=False)
 
 
-# ──────────────────────────────────────────────
-# App
-# ──────────────────────────────────────────────
+# ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Termin-Wächter", lifespan=lifespan)
 
@@ -104,17 +108,12 @@ app.add_middleware(
 )
 
 
-# ──────────────────────────────────────────────
-# Request model
-# ──────────────────────────────────────────────
+# ── Request model ────────────────────────────────────────────────────────────
 
 class StartRequest(BaseModel):
-    email:               str
-    vermittlungscode:    str
-    plz:                 str
-    emailjs_service_id:  str
-    emailjs_template_id: str
-    emailjs_public_key:  str
+    email:            str
+    vermittlungscode: str
+    plz:              str
 
     @field_validator("email")
     @classmethod
@@ -128,7 +127,7 @@ class StartRequest(BaseModel):
     @classmethod
     def v_vc(cls, v: str) -> str:
         v = re.sub(r"[^A-Za-z0-9]", "", v.strip()).upper()
-        if not re.match(r"^[A-Z0-9]{4}[A-Z0-9]{4}[A-Z0-9]{4}$", v):
+        if not re.match(r"^[A-Z0-9]{12}$", v):
             raise ValueError("Format: XXXX-XXXX-XXXX")
         return f"{v[:4]}-{v[4:8]}-{v[8:]}"
 
@@ -140,25 +139,12 @@ class StartRequest(BaseModel):
             raise ValueError("PLZ muss genau 5 Ziffern enthalten")
         return v
 
-    @field_validator("emailjs_service_id", "emailjs_template_id", "emailjs_public_key")
-    @classmethod
-    def v_ejs(cls, v: str) -> str:
-        v = v.strip()[:64]
-        if not re.match(r"^[A-Za-z0-9_\-\.]+$", v):
-            raise ValueError("Ungültiger EmailJS-Wert")
-        return v
 
-
-# ──────────────────────────────────────────────
-# Routes
-# ──────────────────────────────────────────────
+# ── Routes ───────────────────────────────────────────────────────────────────
 
 @app.post("/api/monitor/start")
 async def start(req: StartRequest):
-    job_id = await create_job(
-        req.email, req.vermittlungscode, req.plz,
-        req.emailjs_service_id, req.emailjs_template_id, req.emailjs_public_key,
-    )
+    job_id = await create_job(req.email, req.vermittlungscode, req.plz)
     _add_sched(job_id)
     return {
         "job_id":      job_id,
