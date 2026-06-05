@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#060e1c">
+  <meta name="description" content="Automatische Terminüberwachung für 116117 — Psychiatrie & Nervenheilkunde">
+  <title>Termin-Wächter · 116117</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #060e1c;
+      --bg-card:      rgba(10, 22, 44, 0.7);
+      --bg-input:     rgba(255,255,255,0.04);
+      --bg-focus:     rgba(62,138,255,0.07);
+      --border:       rgba(255,255,255,0.07);
+      --border-focus: rgba(62,138,255,0.45);
+      --accent:       #3e8aff;
+      --accent-dim:   rgba(62,138,255,0.12);
+      --accent-glow:  rgba(62,138,255,0.22);
+      --success:      #22c55e;
+      --success-dim:  rgba(34,197,94,0.08);
+      --error:        #f87171;
+      --error-dim:    rgba(248,113,113,0.08);
+      --text:         #dde8f8;
+      --text-sub:     rgba(221,232,248,0.42);
+      --text-en:      rgba(221,232,248,0.24);
+      --mono:         'JetBrains Mono', monospace;
+      --r:            0.875rem;
+      --r-sm:         0.5rem;
+    }
+
+    html { font-size: clamp(14px, 1.6vw, 16px); }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1rem 5rem;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(62,138,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(62,138,255,.025) 1px, transparent 1px);
+      background-size: 2.5rem 2.5rem;
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -20vh; left: 50%;
+      transform: translateX(-50%);
+      width: 55vw; height: 55vw;
+      background: radial-gradient(circle, rgba(62,138,255,.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    .wrap {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 29rem;
+      display: flex; flex-direction: column; gap: 1.25rem;
+    }
+
+    /* ── Header ── */
+    header { text-align: center; padding: 1.75rem 0 0.5rem; }
+
+    .logo {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 3.25rem; height: 3.25rem;
+      background: var(--accent-dim);
+      border: 1px solid rgba(62,138,255,.2);
+      border-radius: 0.9rem;
+      margin-bottom: 1.1rem;
+    }
+    .logo svg { width: 1.6rem; height: 1.6rem; color: var(--accent); }
+
+    .title-de {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.55rem, 5vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.1;
+    }
+    .title-en {
+      font-size: .72rem; font-weight: 300; font-style: italic;
+      color: var(--text-en); letter-spacing: .04em; margin-top: .25rem;
+    }
+    .subtitle {
+      margin-top: .7rem;
+      font-size: .825rem; color: var(--text-sub); line-height: 1.55;
+    }
+    .subtitle em { font-style: italic; color: var(--text-en); font-size: .75rem; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 1.6rem;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 1.5rem 4rem rgba(0,0,0,.45);
+    }
+
+    /* ── Form ── */
+    .fg { margin-bottom: 1.15rem; }
+    .fg:last-of-type { margin-bottom: 0; }
+
+    label { display: block; margin-bottom: .375rem; }
+    .lde  { font-weight: 600; font-size: .825rem; color: var(--text); }
+    .len  { display: block; font-size: .68rem; font-weight: 300; font-style: italic;
+            color: var(--text-en); margin-top: .1rem; }
+
+    input[type="text"],
+    input[type="email"] {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: .9375rem;
+      padding: .6rem .85rem;
+      outline: none;
+      transition: border-color .18s, background .18s, box-shadow .18s;
+      -webkit-appearance: none;
+    }
+    input:focus {
+      border-color: var(--border-focus);
+      background: var(--bg-focus);
+      box-shadow: 0 0 0 3px rgba(62,138,255,.12);
+    }
+    input.vc {
+      font-family: var(--mono);
+      font-size: .9375rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    input::placeholder { color: rgba(221,232,248,.18); }
+    input.ok  { border-color: rgba(34,197,94,.35); }
+    input.bad { border-color: rgba(248,113,113,.4); }
+
+    .ferr {
+      font-size: .68rem; color: var(--error);
+      margin-top: .3rem; display: none;
+    }
+    .ferr.on { display: block; }
+
+    .hint {
+      margin-top: .35rem;
+      font-size: .69rem; color: var(--text-sub); line-height: 1.45;
+    }
+    .hint em { font-style: italic; color: var(--text-en); }
+
+    /* Help toggle */
+    .htoggle {
+      display: inline-flex; align-items: center; gap: .28rem;
+      font-size: .69rem; color: var(--accent);
+      background: none; border: none; cursor: pointer;
+      font-family: inherit; padding: .2rem 0; margin-top: .35rem;
+      transition: opacity .2s;
+    }
+    .htoggle:hover { opacity: .7; }
+    .htoggle svg { width: .82rem; height: .82rem; flex-shrink: 0; }
+
+    .hbox {
+      display: none; margin-top: .55rem;
+      background: rgba(62,138,255,.05);
+      border: 1px solid rgba(62,138,255,.13);
+      border-radius: var(--r-sm);
+      padding: .7rem .85rem;
+      font-size: .72rem; line-height: 1.55; color: var(--text-sub);
+    }
+    .hbox.on { display: block; }
+    .hbox p + p { margin-top: .35rem; }
+    .hbox .en { font-style: italic; color: var(--text-en); }
+
+    /* Privacy badge */
+    .pbadge {
+      display: flex; align-items: flex-start; gap: .45rem;
+      margin-top: .5rem;
+      padding: .55rem .7rem;
+      background: rgba(34,197,94,.04);
+      border: 1px solid rgba(34,197,94,.1);
+      border-radius: var(--r-sm);
+      font-size: .68rem; color: var(--text-sub); line-height: 1.45;
+    }
+    .pbadge svg {
+      width: .82rem; height: .82rem; color: var(--success);
+      flex-shrink: 0; margin-top: .05rem;
+    }
+    .pbadge em { font-style: italic; color: var(--text-en); display: block; margin-top: .15rem; }
+
+    /* Divider */
+    .div { height: 1px; background: var(--border); margin: 1.1rem 0; }
+
+    /* Submit button */
+    .btn-go {
+      width: 100%; background: var(--accent);
+      color: #fff; border: none; border-radius: var(--r-sm);
+      padding: .78rem 1.5rem; margin-top: 1.4rem;
+      font-family: 'Syne', sans-serif;
+      font-size: .9rem; font-weight: 700; letter-spacing: .02em;
+      cursor: pointer;
+      transition: background .18s, box-shadow .18s, transform .1s;
+    }
+    .btn-go:hover {
+      background: #5fa0ff;
+      box-shadow: 0 .5rem 1.8rem var(--accent-glow);
+    }
+    .btn-go:active  { transform: scale(.98); }
+    .btn-go:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .btn-go .bde { display: block; }
+    .btn-go .ben {
+      display: block; font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: .67rem; font-weight: 300; font-style: italic;
+      opacity: .6; margin-top: .08rem;
+    }
+
+    /* ── Status card ── */
+    #status-card { display: none; }
+
+    .sh { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.15rem; }
+
+    .pring {
+      position: relative; width: 2.4rem; height: 2.4rem; flex-shrink: 0;
+    }
+    .pring::before, .pring::after {
+      content: ''; position: absolute; inset: 0;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 1px solid rgba(62,138,255,.35);
+      animation: pring 2.2s ease-out infinite;
+    }
+    .pring::after { animation-delay: 1.1s; }
+    .pdot {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: .65rem; height: .65rem;
+      background: var(--accent); border-radius: 50%; z-index: 1;
+    }
+    @keyframes pring {
+      0%   { transform: scale(.5); opacity: .9; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    .st-de { font-family: 'Syne', sans-serif; font-size: .95rem; font-weight: 700; }
+    .st-en { font-size: .67rem; font-weight: 300; font-style: italic; color: var(--text-en); margin-top: .1rem; }
+
+    .smeta { font-size: .75rem; color: var(--text-sub); line-height: 1.65; }
+    .smeta .mono { font-family: var(--mono); font-size: .68rem; color: var(--accent); }
+
+    .btn-stop {
+      width: 100%; background: transparent;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: .62rem; color: var(--text-sub);
+      font-family: inherit; font-size: .8rem; cursor: pointer;
+      transition: border-color .18s, color .18s;
+    }
+    .btn-stop:hover { border-color: var(--error); color: var(--error); }
+
+    /* ── Banners ── */
+    .banner {
+      border-radius: var(--r); padding: 1.15rem 1.35rem;
+      display: none; animation: slidein .35s ease;
+    }
+    @keyframes slidein {
+      from { opacity: 0; transform: translateY(-.4rem); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .banner.s { background: var(--success-dim); border: 1px solid rgba(34,197,94,.2); }
+    .banner.e { background: var(--error-dim);   border: 1px solid rgba(248,113,113,.2); }
+
+    .btitle {
+      font-family: 'Syne', sans-serif; font-size: .95rem; font-weight: 700;
+      margin-bottom: .35rem;
+      display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
+    }
+    .btitle em {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 300; font-style: italic; font-size: .7rem; color: var(--text-en);
+    }
+    .bbody { font-size: .77rem; color: var(--text-sub); line-height: 1.5; }
+    .bbody em { font-style: italic; color: var(--text-en); }
+
+    .bklink {
+      display: inline-block; margin-top: .7rem;
+      padding: .45rem .95rem;
+      background: var(--success); color: #fff;
+      border-radius: var(--r-sm); font-size: .8rem; font-weight: 600;
+      text-decoration: none; transition: opacity .18s;
+    }
+    .bklink:hover { opacity: .85; }
+
+    /* Spinner */
+    .spin {
+      display: inline-block; width: .85rem; height: .85rem;
+      border: 2px solid rgba(255,255,255,.25); border-top-color: #fff;
+      border-radius: 50%; animation: rot .6s linear infinite;
+      vertical-align: middle; margin-right: .35rem;
+    }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center; font-size: .68rem; color: var(--text-en);
+      padding-top: .5rem; line-height: 1.85;
+    }
+    .fauthor { font-family: 'Syne', sans-serif; font-size: .72rem; font-weight: 700; color: var(--text-sub); }
+    footer a { color: var(--text-sub); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 440px) {
+      body  { padding: 1.25rem .75rem 4rem; }
+      .card { padding: 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+      </svg>
+    </div>
+    <div class="title-de">Termin-Wächter</div>
+    <div class="title-en">Appointment Monitor · 116117 Terminservice</div>
+    <p class="subtitle">
+      Automatische Benachrichtigung bei freien Terminen — Psychiatrie &amp; Nervenheilkunde.<br>
+      <em>Automatic notification when psychiatric appointments become available.</em>
+    </p>
+  </header>
+
+  <!-- ── Form card ── -->
+  <div class="card" id="form-card">
+
+    <!-- E-Mail -->
+    <div class="fg">
+      <label for="inp-email">
+        <span class="lde">E-Mail-Adresse</span>
+        <span class="len">Email Address — for appointment notifications</span>
+      </label>
+      <input type="email" id="inp-email"
+             placeholder="ihre@email.de"
+             maxlength="254"
+             autocomplete="email"
+             autocorrect="off" autocapitalize="off" spellcheck="false">
+      <div class="ferr" id="err-email">Ungültige E-Mail-Adresse · Invalid email address</div>
+      <div class="pbadge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5
+                   a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0
+                   0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75
+                   a2.25 2.25 0 0 0 2.25 2.25Z"/>
+        </svg>
+        <div>
+          Ihre E-Mail wird <strong>verschlüsselt</strong> gespeichert und ausschließlich zur Terminbenachrichtigung verwendet. Keine Weitergabe an Dritte.
+          <em>Your email is encrypted at rest and used only for appointment notifications. Never shared with third parties.</em>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vermittlungscode -->
+    <div class="fg">
+      <label for="inp-vc">
+        <span class="lde">Vermittlungscode</span>
+        <span class="len">Referral Code — from your GP's referral slip</span>
+      </label>
+      <input type="text" id="inp-vc" class="vc"
+             placeholder="XXXX-XXXX-XXXX"
+             maxlength="14"
+             autocomplete="off"
+             autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <div class="ferr" id="err-vc">Format: XXXX-XXXX-XXXX (Buchstaben &amp; Ziffern) · Letters and digits only</div>
+
+      <button class="htoggle" type="button" onclick="toggleBox('hvc')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path stroke-linecap="round" d="M12 16v-4M12 8h.01"/>
+        </svg>
+        Wo finde ich meinen Code? · Where do I find it?
+      </button>
+      <div class="hbox" id="hvc">
+        <p>Den Vermittlungscode erhalten Sie auf dem <strong>Überweisungsschein (Muster 6)</strong> von Ihrem Hausarzt. Er steht dort als 12-stelliger Code im Format <strong>XXXX-XXXX-XXXX</strong>.</p>
+        <p class="en">Your referral code is printed on the referral slip (Überweisung) from your GP. It is valid for one specialist appointment arranged through 116117.</p>
+      </div>
+    </div>
+
+    <!-- PLZ -->
+    <div class="fg">
+      <label for="inp-plz">
+        <span class="lde">Postleitzahl (Ihr Wohnort)</span>
+        <span class="len">Postal Code — your location</span>
+      </label>
+      <input type="text" id="inp-plz"
+             placeholder="80331"
+             maxlength="5"
+             inputmode="numeric"
+             autocomplete="postal-code"
+             autocorrect="off" spellcheck="false">
+      <div class="ferr" id="err-plz">Bitte geben Sie eine gültige 5-stellige PLZ ein · 5 digits required</div>
+      <div class="hint">
+        Termine werden im Umkreis von <strong>150 km</strong> um Ihre PLZ gesucht.
+        <em>· Appointments searched within a 150 km radius.</em>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button class="btn-go" id="btn-go" type="button" onclick="startMonitoring()">
+      <span class="bde">Überwachung starten</span>
+      <span class="ben">Start Monitoring</span>
+    </button>
+  </div>
+
+  <!-- ── Status card ── -->
+  <div class="card" id="status-card">
+    <div class="sh">
+      <div class="pring"><div class="pdot"></div></div>
+      <div>
+        <div class="st-de">Überwachung aktiv</div>
+        <div class="st-en">Monitoring Active</div>
+      </div>
+    </div>
+    <div class="smeta">
+      <div>Zuletzt geprüft · <em>Last checked</em>: <span class="mono" id="ts">—</span></div>
+      <div>Nächste Prüfung in ca. 10 Min. · <em>Next check in ~10 min</em></div>
+      <div>Radius: <span class="mono">150 km</span> · Fachrichtung: <span class="mono">Psychiatrie / Neurologie</span></div>
+    </div>
+    <div class="div"></div>
+    <button class="btn-stop" type="button" onclick="stopMonitoring()">
+      Überwachung stoppen · <em>Stop Monitoring</em>
+    </button>
+  </div>
+
+  <!-- ── Success banner ── -->
+  <div class="banner s" id="ban-ok">
+    <div class="btitle">✓ Freier Termin gefunden! <em>Free Appointment Found!</em></div>
+    <div class="bbody">
+      Eine Benachrichtigung wurde an Ihre E-Mail-Adresse gesendet. Buchen Sie Ihren Termin jetzt.<br>
+      <em>A notification has been sent to your email. Book your appointment now.</em>
+      <br>
+      <a id="bklink" href="#" target="_blank" rel="noopener" class="bklink">
+        Jetzt buchen · Book Now
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Error banner ── -->
+  <div class="banner e" id="ban-err">
+    <div class="btitle">⚠ Fehler <em>Error</em></div>
+    <div class="bbody" id="err-msg">—</div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="fauthor">© 2026 Andrei Tregubov</div>
+    <div>Termin-Wächter · Psychiatrie &amp; Nervenheilkunde · 116117 Terminservice</div>
+    <div style="font-style:italic;margin-top:.15rem">
+      Dieses Tool ist nicht mit der KBV oder 116117 assoziiert. Nur für den persönlichen Gebrauch.<br>
+      This tool is not affiliated with KBV or 116117. For personal use only.
+    </div>
+  </footer>
+
+</div>
+
+<script>
+"use strict";
+
+const S = { jobId: null, email: null, bookingUrl: null, pollTimer: null };
+const API = window.location.origin;
+const $ = id => document.getElementById(id);
+const show = id => $(id).style.display = 'block';
+const hide = id => $(id).style.display = 'none';
+
+// ── Restore from localStorage ────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const raw = localStorage.getItem('tw_job');
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    if (d.jobId) {
+      Object.assign(S, d);
+      hide('form-card'); show('status-card');
+      poll();
+    }
+  } catch { localStorage.removeItem('tw_job'); }
+});
+
+// ── Input formatting ──────────────────────────────────────────────────────────
+$('inp-vc').addEventListener('input', function () {
+  let v = this.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,12);
+  if (v.length > 8)      v = v.slice(0,4)+'-'+v.slice(4,8)+'-'+v.slice(8);
+  else if (v.length > 4) v = v.slice(0,4)+'-'+v.slice(4);
+  this.value = v;
+});
+
+$('inp-plz').addEventListener('input', function () {
+  this.value = this.value.replace(/[^0-9]/g,'').slice(0,5);
+});
+
+// Sanitize paste in all inputs
+document.querySelectorAll('input').forEach(el => {
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false,
+      t.replace(/[<>"'`\\]/g,'').slice(0,300));
+  });
+});
+
+// ── Validation ────────────────────────────────────────────────────────────────
+const reEmail = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const reVC    = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+const rePLZ   = /^\d{5}$/;
+
+function san(s, max=256) {
+  return String(s).replace(/[<>"'`\\]/g,'').trim().slice(0,max);
+}
+
+function ferr(id, on) { $(id).classList.toggle('on', on); }
+
+function validate() {
+  const email = san($('inp-email').value);
+  const vc    = $('inp-vc').value.toUpperCase().trim();
+  const plz   = $('inp-plz').value.trim();
+  let ok = true;
+
+  ferr('err-email', !reEmail.test(email)); if (!reEmail.test(email)) ok=false;
+  ferr('err-vc',    !reVC.test(vc));       if (!reVC.test(vc))    ok=false;
+  ferr('err-plz',   !rePLZ.test(plz));     if (!rePLZ.test(plz))  ok=false;
+
+  return ok ? { email, vc, plz } : null;
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function toggleBox(id) { $(id).classList.toggle('on'); }
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('de-DE', {
+    day:'2-digit', month:'2-digit', year:'numeric',
+    hour:'2-digit', minute:'2-digit', second:'2-digit'
+  });
+}
+
+function resetBtn() {
+  const b = $('btn-go');
+  b.disabled = false;
+  b.innerHTML = '<span class="bde">Überwachung starten</span><span class="ben">Start Monitoring</span>';
+}
+
+// ── Start monitoring ──────────────────────────────────────────────────────────
+async function startMonitoring() {
+  const f = validate();
+  if (!f) return;
+
+  const btn = $('btn-go');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span><span class="bde">Verbinde…</span><span class="ben">Connecting…</span>';
+  hide('ban-err'); hide('ban-ok');
+
+  try {
+    const r = await fetch(`${API}/api/monitor/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: f.email,
+        vermittlungscode: f.vc,
+        plz: f.plz
+      })
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || `HTTP ${r.status}`); }
+    const d = await r.json();
+
+    S.jobId = d.job_id;
+    S.email = f.email;
+    S.bookingUrl = d.booking_url;
+
+    localStorage.setItem('tw_job', JSON.stringify({
+      jobId: S.jobId, email: S.email, bookingUrl: S.bookingUrl
+    }));
+
+    hide('form-card'); show('status-card');
+    poll();
+
+  } catch(e) {
+    resetBtn();
+    $('err-msg').innerHTML = san(e.message) + '<br><em>Please check your inputs and try again.</em>';
+    show('ban-err');
+  }
+}
+
+// ── Poll status ───────────────────────────────────────────────────────────────
+async function poll() {
+  if (!S.jobId) return;
+  try {
+    const r = await fetch(`${API}/api/monitor/status/${S.jobId}`);
+    if (r.status === 404) {
+      localStorage.removeItem('tw_job');
+      hide('status-card'); show('form-card');
+      return;
+    }
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+
+    $('ts').textContent = fmtDate(d.last_checked);
+
+    if (d.status === 'found') {
+      clearTimeout(S.pollTimer);
+      localStorage.removeItem('tw_job');
+      $('bklink').href = d.booking_url;
+      show('ban-ok');
+      return;
+    }
+    if (d.status === 'error') {
+      clearTimeout(S.pollTimer);
+      $('err-msg').innerHTML =
+        san(d.error_message || 'Unbekannter Fehler') +
+        '<br><em>An error occurred. Please restart monitoring.</em>';
+      show('ban-err');
+      return;
+    }
+    // still running
+    S.pollTimer = setTimeout(poll, 30_000);
+
+  } catch {
+    S.pollTimer = setTimeout(poll, 60_000);
+  }
+}
+
+// ── Stop monitoring ───────────────────────────────────────────────────────────
+async function stopMonitoring() {
+  clearTimeout(S.pollTimer);
+  localStorage.removeItem('tw_job');
+  if (S.jobId) {
+    fetch(`${API}/api/monitor/${S.jobId}`, { method: 'DELETE' }).catch(() => {});
+  }
+  S.jobId = S.email = S.bookingUrl = null;
+  hide('status-card'); hide('ban-ok'); hide('ban-err');
+  resetBtn();
+  show('form-card');
+}
+</script>
+</body>
+</html>
