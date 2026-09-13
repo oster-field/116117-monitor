@@ -66,3 +66,60 @@ def send_appointment_found(to_email: str, booking_url: str, result: str) -> None
         logger.info("Email sent to %s", to_email)
     except Exception as exc:
         logger.error("Failed to send email to %s: %s", to_email, exc)
+
+
+def send_monitoring_stopped(to_email: str, reason: str) -> None:
+    """Send notification when monitoring permanently stops after repeated
+    consecutive errors — so the user finds out instead of waiting forever
+    for an email that will never come."""
+
+    html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                max-width: 520px; margin: 0 auto; padding: 2rem; background: #f8fafc;">
+
+      <div style="background: #fff; border-radius: 12px; padding: 2rem;
+                  border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,.06);">
+
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <div style="display: inline-block; background: #fee2e2; border-radius: 50%;
+                      width: 3.5rem; height: 3.5rem; line-height: 3.5rem;
+                      font-size: 1.75rem; text-align: center;">⚠</div>
+        </div>
+
+        <h1 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;
+                   text-align: center; margin: 0 0 .4rem;">
+          Überwachung gestoppt
+        </h1>
+        <p style="text-align: center; color: #64748b; font-size: .875rem; margin: 0 0 1.75rem;">
+          Monitoring stopped
+        </p>
+
+        <p style="color: #334155; font-size: .9rem; line-height: 1.6; margin: 0 0 .5rem;">
+          Die automatische Suche wurde nach mehreren fehlgeschlagenen
+          Versuchen in Folge gestoppt.<br>
+          <strong>Grund:</strong> {reason}
+        </p>
+        <p style="color: #94a3b8; font-size: .8rem; font-style: italic; margin: 0 0 1.75rem;">
+          Automatic search was stopped after repeated failed attempts.
+          Please start a new search on the website if you'd like to keep monitoring.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.75rem 0 1rem;">
+        <p style="text-align: center; font-size: .72rem; color: #cbd5e1;">
+          Termin-Wächter · 116117 Terminservice<br>
+          © 2026 Andrei Tregubov
+        </p>
+      </div>
+    </div>
+    """
+
+    try:
+        resend.Emails.send({
+            "from":    FROM_EMAIL,
+            "to":      [to_email],
+            "subject": "⚠ Termin-Wächter: Überwachung gestoppt / Monitoring stopped",
+            "html":    html,
+        })
+        logger.info("Stop-notification sent to %s", to_email)
+    except Exception as exc:
+        logger.error("Failed to send stop-notification to %s: %s", to_email, exc)

@@ -20,7 +20,7 @@ from database import (
     get_all_running, set_status, touch_job, remove_job,
 )
 from scraper import check_appointments, build_url
-from email_sender import send_appointment_found
+from email_sender import send_appointment_found, send_monitoring_stopped
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,6 +33,13 @@ scheduler = AsyncIOScheduler(timezone="Europe/Berlin")
 UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
+
+# A single scrape failure (timeout, temporary block, browser hiccup) must
+# NOT permanently kill a user's monitoring — only give up after several in
+# a row. In-memory is fine: worst case after a restart is a few extra
+# retries, never a false "gave up".
+MAX_CONSECUTIVE_ERRORS = int(os.getenv("MAX_CONSECUTIVE_ERRORS", "6"))  # ~1h at 10-min interval
+_consecutive_errors: dict[str, int] = {}
 
 
 # ── Scheduler helpers ────────────────────────────────────────────────────────
@@ -59,6 +66,7 @@ async def _poll(job_id: str) -> None:
     job = await get_job(job_id)
     if not job or job["status"] != "running":
         _remove_sched(job_id)
+        _consecutive_errors.pop(job_id, None)
         return
 
     result = await check_appointments(job["vermittlungscode"], job["plz"])
@@ -67,6 +75,7 @@ async def _poll(job_id: str) -> None:
         msg = f"{result['count']} Termine gefunden"
         await set_status(job_id, "found", result=msg)
         _remove_sched(job_id)
+        _consecutive_errors.pop(job_id, None)
         logger.info("Job %s → FOUND %d appointments", job_id, result["count"])
         # Run sync Resend call in a thread — avoids blocking the async event loop
         await asyncio.to_thread(
@@ -75,10 +84,32 @@ async def _poll(job_id: str) -> None:
         )
 
     elif result["status"] == "error":
-        await set_status(job_id, "error", error=result["message"])
-        logger.warning("Job %s → error: %s", job_id, result["message"])
+        fails = _consecutive_errors.get(job_id, 0) + 1
+        _consecutive_errors[job_id] = fails
+        logger.warning(
+            "Job %s → error (%d/%d consecutive): %s",
+            job_id, fails, MAX_CONSECUTIVE_ERRORS, result["message"],
+        )
+
+        if fails >= MAX_CONSECUTIVE_ERRORS:
+            # Genuinely stuck — stop polling and TELL the user, instead of
+            # dying silently like before.
+            await set_status(job_id, "error", error=result["message"])
+            _remove_sched(job_id)
+            _consecutive_errors.pop(job_id, None)
+            logger.error("Job %s → giving up after %d consecutive errors", job_id, fails)
+            await asyncio.to_thread(
+                send_monitoring_stopped,
+                job["email"], result["message"],
+            )
+        else:
+            # Likely transient — keep status "running" so the scheduler
+            # keeps retrying next tick, but surface the latest error so
+            # GET /api/monitor/status/{id} isn't lying about it.
+            await set_status(job_id, "running", error=result["message"])
 
     else:
+        _consecutive_errors.pop(job_id, None)
         await touch_job(job_id)
         logger.info("Job %s → 0 appointments, continuing", job_id)
 
