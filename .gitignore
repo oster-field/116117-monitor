@@ -25,6 +25,7 @@ pip-selfcheck.json
 *.bit
 *.bld
 *.cmd_log
+*.db
 *.drc
 *.ll
 *.lso
