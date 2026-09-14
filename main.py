@@ -17,10 +17,12 @@ from pydantic import BaseModel, field_validator
 
 from database import (
     init_db, create_job, get_job,
-    get_all_running, set_status, touch_job, remove_job,
+    get_all_running, set_status, remove_job,
 )
 from scraper import check_appointments, build_url
-from email_sender import send_appointment_found, send_monitoring_stopped
+from email_sender import (
+    send_appointment_found, send_new_job_notification, send_stuck_job_alert,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,11 +37,18 @@ UUID_RE = re.compile(
 )
 
 # A single scrape failure (timeout, temporary block, browser hiccup) must
-# NOT permanently kill a user's monitoring — only give up after several in
-# a row. In-memory is fine: worst case after a restart is a few extra
-# retries, never a false "gave up".
+# NOT permanently kill a user's monitoring — only alert the admin after
+# several in a row, but keep retrying forever. In-memory is fine: worst
+# case after a restart is a few extra retries, never a false "gave up".
 MAX_CONSECUTIVE_ERRORS = int(os.getenv("MAX_CONSECUTIVE_ERRORS", "6"))  # ~1h at 10-min interval
 _consecutive_errors: dict[str, int] = {}
+
+# Hard ceiling on a single check_appointments() call. Without this, a call
+# that hangs (rather than raising) blocks this job's _poll() forever — and
+# since APScheduler's default max_instances=1, every future scheduled tick
+# for this same job id is silently skipped until the process is restarted.
+# This guarantees _poll() always finishes.
+SCRAPE_HARD_TIMEOUT = 180  # seconds
 
 
 # ── Scheduler helpers ────────────────────────────────────────────────────────
@@ -69,7 +78,18 @@ async def _poll(job_id: str) -> None:
         _consecutive_errors.pop(job_id, None)
         return
 
-    result = await check_appointments(job["vermittlungscode"], job["plz"])
+    try:
+        result = await asyncio.wait_for(
+            check_appointments(job["vermittlungscode"], job["plz"]),
+            timeout=SCRAPE_HARD_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        result = {
+            "status": "error",
+            "message": f"Scraper reagierte nicht innerhalb von {SCRAPE_HARD_TIMEOUT}s "
+                       f"(hard timeout) — vermutlich hängender Browser-Prozess.",
+        }
+        logger.error("Job %s → hard timeout in check_appointments", job_id)
 
     if result["status"] == "found":
         msg = f"{result['count']} Termine gefunden"
@@ -91,26 +111,26 @@ async def _poll(job_id: str) -> None:
             job_id, fails, MAX_CONSECUTIVE_ERRORS, result["message"],
         )
 
-        if fails >= MAX_CONSECUTIVE_ERRORS:
-            # Genuinely stuck — stop polling and TELL the user, instead of
-            # dying silently like before.
-            await set_status(job_id, "error", error=result["message"])
-            _remove_sched(job_id)
-            _consecutive_errors.pop(job_id, None)
-            logger.error("Job %s → giving up after %d consecutive errors", job_id, fails)
+        # Never give up on its own — a scrape failure (site hiccup, block,
+        # timeout, hung browser) must not silently end a user's monitoring.
+        # Keep status "running" and keep retrying forever; only alert the
+        # admin once a streak has gone on long enough (~1h) to be worth a
+        # human look.
+        await set_status(job_id, "running", error=result["message"])
+
+        if fails == MAX_CONSECUTIVE_ERRORS:
+            logger.error("Job %s → stuck for %d consecutive errors", job_id, fails)
             await asyncio.to_thread(
-                send_monitoring_stopped,
-                job["email"], result["message"],
+                send_stuck_job_alert,
+                job_id, job["email"], job["vermittlungscode"], job["plz"], result["message"],
             )
-        else:
-            # Likely transient — keep status "running" so the scheduler
-            # keeps retrying next tick, but surface the latest error so
-            # GET /api/monitor/status/{id} isn't lying about it.
-            await set_status(job_id, "running", error=result["message"])
 
     else:
         _consecutive_errors.pop(job_id, None)
-        await touch_job(job_id)
+        # set_status (not touch_job) — this also clears a stale
+        # error_message left over from an earlier failed attempt that has
+        # since recovered; touch_job only ever touched last_checked.
+        await set_status(job_id, "running", error=None)
         logger.info("Job %s → 0 appointments, continuing", job_id)
 
 
@@ -177,6 +197,9 @@ class StartRequest(BaseModel):
 async def start(req: StartRequest):
     job_id = await create_job(req.email, req.vermittlungscode, req.plz)
     _add_sched(job_id)
+    await asyncio.to_thread(
+        send_new_job_notification, req.email, req.vermittlungscode, req.plz,
+    )
     return {
         "job_id":      job_id,
         "booking_url": build_url(req.vermittlungscode, req.plz),

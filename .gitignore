@@ -27,6 +27,7 @@ pip-selfcheck.json
 *.cmd_log
 *.db
 *.drc
+*.env
 *.ll
 *.lso
 *.msd

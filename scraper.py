@@ -52,24 +52,26 @@ async def check_appointments(vc: str, plz: str) -> dict:
                     "--window-size=1920,1080",
                 ],
             )
-            context = await browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                locale="de-DE",
-                timezone_id="Europe/Berlin",
-                viewport={"width": 1920, "height": 1080},
-            )
-            await context.add_init_script(STEALTH_JS)
-            page = await context.new_page()
+            try:
+                context = await browser.new_context(
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    ),
+                    locale="de-DE",
+                    timezone_id="Europe/Berlin",
+                    viewport={"width": 1920, "height": 1080},
+                )
+                await context.add_init_script(STEALTH_JS)
+                page = await context.new_page()
 
-            await page.goto(url, timeout=60_000)
-            await page.wait_for_timeout(6_000)   # let JS render
+                await page.goto(url, timeout=60_000)
+                await page.wait_for_timeout(6_000)  # let JS render
 
-            text = await page.inner_text("body")
-            await browser.close()
+                text = await page.inner_text("body")
+            finally:
+                await browser.close()
 
         # — Parse result —
         if "Access Denied" in text or "Forbidden" in text:
