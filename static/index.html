@@ -6,18 +6,8 @@
   <meta name="theme-color" content="#060e1c">
   <meta name="description" content="Automatische Terminüberwachung für 116117 — Psychiatrie & Nervenheilkunde">
   <title>Termin-Wächter · 116117</title>
-      <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-R2S0KK9753"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-R2S0KK9753');
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/img/favicon.png?v=1">
+  <link rel="stylesheet" href="/fonts/fonts.css">
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -324,6 +314,53 @@
     }
     @keyframes rot { to { transform: rotate(360deg); } }
 
+    /* Spam note, consent line, cookie banner */
+    .pbadge.info { background: rgba(62,138,255,.05); border-color: rgba(62,138,255,.14); }
+    .pbadge.info svg { color: var(--accent); }
+    .pbadge strong { color: var(--text); font-weight: 600; }
+
+    .consent {
+      display: flex; align-items: flex-start; gap: .65rem;
+      margin: 0; cursor: pointer;
+      font-size: .7rem; color: var(--text-sub); line-height: 1.5;
+    }
+    .consent input {
+      flex-shrink: 0; width: 1rem; height: 1rem; margin-top: .1rem;
+      accent-color: var(--accent); cursor: pointer;
+    }
+    .consent em { display: block; margin-top: .2rem; font-style: italic; color: var(--text-en); }
+    .consent a { color: var(--text-sub); }
+    .consent a:hover { color: var(--text); }
+
+    .bnote { margin-top: .6rem; }
+    .bnote strong { color: var(--text); font-weight: 600; }
+
+    .cc {
+      display: none; position: fixed; z-index: 10;
+      left: 50%; bottom: 1rem; transform: translateX(-50%);
+      width: calc(100% - 1.5rem); max-width: 29rem;
+      background: rgba(10, 22, 44, .96);
+      border: 1px solid var(--border); border-radius: var(--r);
+      padding: 1rem 1.15rem;
+      box-shadow: 0 1.5rem 4rem rgba(0,0,0,.6);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .cc.on { display: block; }
+    .cc p { font-size: .72rem; color: var(--text-sub); line-height: 1.5; }
+    .cc em { display: block; margin-top: .25rem; font-style: italic; color: var(--text-en); }
+    .cc a { color: var(--text-sub); }
+    .cc a:hover { color: var(--text); }
+    .cc-btns { display: flex; gap: .6rem; margin-top: .8rem; }
+    .cc-btns button {
+      flex: 1; padding: .55rem .6rem; cursor: pointer;
+      background: var(--accent-dim); border: 1px solid rgba(62,138,255,.35);
+      border-radius: var(--r-sm); color: var(--text);
+      font-family: inherit; font-size: .8rem; font-weight: 600;
+      transition: background .18s, border-color .18s;
+    }
+    .cc-btns button:hover { background: rgba(62,138,255,.22); border-color: var(--accent); }
+    .cc-btns span { display: block; font-size: .64rem; font-weight: 300; font-style: italic; opacity: .65; }
+
     /* ── Footer ── */
     footer {
       text-align: center; font-size: .68rem; color: var(--text-en);
@@ -393,6 +430,17 @@
           <em>Your email is encrypted at rest and used only for appointment notifications. Never shared with third parties.</em>
         </div>
       </div>
+
+      <div class="pbadge info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+        </svg>
+        <div>
+          Benachrichtigungen können im <strong>Spam-Ordner</strong> landen. Bitte prüfen Sie ihn regelmäßig und markieren Sie unsere E-Mail als „Kein Spam“.
+          <em>Notifications may end up in your spam folder. Please check it regularly and mark our email as “not spam”.</em>
+        </div>
+      </div>
     </div>
 
     <!-- Vermittlungscode -->
@@ -440,6 +488,18 @@
       </div>
     </div>
 
+    <!-- Consent -->
+    <div class="fg">
+      <label class="consent" for="inp-consent">
+        <input type="checkbox" id="inp-consent">
+        <span>
+          Ich willige ein, dass meine E-Mail-Adresse, mein Vermittlungscode und meine PLZ zur Terminüberwachung verarbeitet werden. Das kann Gesundheitsdaten betreffen (Art. 6 Abs. 1 lit. a, Art. 9 Abs. 2 lit. a DSGVO). Widerruf jederzeit möglich. <a href="/datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a>
+          <em>I consent to my email address, referral code and postal code being processed for appointment monitoring. This may involve health data. I can withdraw at any time. <a href="/datenschutz?lang=en" target="_blank" rel="noopener">Privacy policy</a></em>
+        </span>
+      </label>
+      <div class="ferr" id="err-consent">Bitte Einwilligung bestätigen · Please confirm your consent</div>
+    </div>
+
     <!-- Submit -->
     <button class="btn-go" id="btn-go" type="button" onclick="startMonitoring()">
       <span class="bde">Überwachung starten</span>
@@ -461,6 +521,16 @@
       <div>Nächste Prüfung in ca. 10 Min. · <em>Next check in ~10 min</em></div>
       <div>Radius: <span class="mono">150 km</span> · Fachrichtung: <span class="mono">Psychiatrie / Neurologie</span></div>
     </div>
+    <div class="pbadge info">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+        </svg>
+      <div>
+        Die Benachrichtigung kann im <strong>Spam-Ordner</strong> landen. Bitte schauen Sie dort nach, wenn im Posteingang nichts ankommt.
+        <em>The notification may end up in your spam folder. Please look there if nothing arrives in your inbox.</em>
+      </div>
+    </div>
     <div class="div"></div>
     <button class="btn-stop" type="button" onclick="stopMonitoring()">
       Überwachung stoppen · <em>Stop Monitoring</em>
@@ -473,7 +543,10 @@
     <div class="bbody">
       Eine Benachrichtigung wurde an Ihre E-Mail-Adresse gesendet. Buchen Sie Ihren Termin jetzt.<br>
       <em>A notification has been sent to your email. Book your appointment now.</em>
-      <br>
+      <div class="bnote">
+        Keine E-Mail im Posteingang? Bitte auch den <strong>Spam-Ordner</strong> prüfen.<br>
+        <em>Nothing in your inbox? Please check your spam folder too.</em>
+      </div>
       <a id="bklink" href="#" target="_blank" rel="noopener" class="bklink">
         Jetzt buchen · Book Now
       </a>
@@ -489,6 +562,11 @@
   <!-- ── Footer ── -->
   <footer>
     <div class="fauthor">© 2026 <a href="https://andrei-tregubov.works" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px solid rgba(255,255,255,0.2);">Andrei Tregubov</a></div>
+    <div>
+      <a href="/impressum">Impressum</a> ·
+      <a href="/datenschutz">Datenschutz · Privacy</a> ·
+      <a href="#" onclick="openConsent(event)">Cookie-Einstellungen · Cookie settings</a>
+    </div>
     <div>Termin-Wächter · Psychiatrie &amp; Nervenheilkunde · 116117 Terminservice</div>
     <div style="font-style:italic;margin-top:.15rem">
       Dieses Tool ist nicht mit der KBV oder 116117 assoziiert. Nur für den persönlichen Gebrauch.<br>
@@ -496,6 +574,18 @@
     </div>
   </footer>
 
+</div>
+
+<!-- ── Cookie consent ── -->
+<div class="cc" id="cc" role="dialog" aria-label="Cookie-Einstellungen · Cookie settings">
+  <p>
+    Mit Ihrer Einwilligung nutzen wir Google Analytics zur Reichweitenmessung. Ohne Einwilligung wird keine Verbindung zu Google aufgebaut. <a href="/datenschutz#analytics">Details</a>
+    <em>With your consent we use Google Analytics to measure usage. Without it, no connection to Google is made. <a href="/datenschutz?lang=en#analytics">Details</a></em>
+  </p>
+  <div class="cc-btns">
+    <button type="button" onclick="setConsent(false)">Ablehnen<span>Decline</span></button>
+    <button type="button" onclick="setConsent(true)">Zustimmen<span>Accept</span></button>
+  </div>
 </div>
 
 <script>
@@ -506,6 +596,51 @@ const API = window.location.origin;
 const $ = id => document.getElementById(id);
 const show = id => $(id).style.display = 'block';
 const hide = id => $(id).style.display = 'none';
+
+// ── Analytics consent: Google Analytics loads only after opt-in ──────────────
+const GA_ID = 'G-R2S0KK9753';
+
+function loadGA() {
+  window['ga-disable-' + GA_ID] = false;
+  if (window.gtag) return;
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { dataLayer.push(arguments); };
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+  document.head.appendChild(s);
+  gtag('js', new Date());
+  gtag('config', GA_ID);
+}
+
+function dropGA() {
+  window['ga-disable-' + GA_ID] = true;
+  const root = location.hostname.split('.').slice(-2).join('.');
+  document.cookie.split(';').forEach(c => {
+    const name = c.split('=')[0].trim();
+    if (!name.startsWith('_ga')) return;
+    [location.hostname, '.' + root].forEach(d => {
+      document.cookie = `${name}=; Max-Age=0; path=/; domain=${d}`;
+    });
+  });
+}
+
+function setConsent(on) {
+  localStorage.setItem('tw_consent', on ? 'granted' : 'denied');
+  $('cc').classList.remove('on');
+  if (on) loadGA(); else dropGA();
+}
+
+function openConsent(e) {
+  if (e) e.preventDefault();
+  $('cc').classList.add('on');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const c = localStorage.getItem('tw_consent');
+  if (c === 'granted') loadGA();
+  if (!c || location.hash === '#consent') openConsent();
+});
 
 // ── Restore from localStorage ────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -563,6 +698,9 @@ function validate() {
   ferr('err-email', !reEmail.test(email)); if (!reEmail.test(email)) ok=false;
   ferr('err-vc',    !reVC.test(vc));       if (!reVC.test(vc))    ok=false;
   ferr('err-plz',   !rePLZ.test(plz));     if (!rePLZ.test(plz))  ok=false;
+
+  const consent = $('inp-consent').checked;
+  ferr('err-consent', !consent);           if (!consent)          ok=false;
 
   return ok ? { email, vc, plz } : null;
 }
@@ -671,6 +809,7 @@ async function stopMonitoring() {
     fetch(`${API}/api/monitor/${S.jobId}`, { method: 'DELETE' }).catch(() => {});
   }
   S.jobId = S.email = S.bookingUrl = null;
+  $('inp-consent').checked = false;
   hide('status-card'); hide('ban-ok'); hide('ban-err');
   resetBtn();
   show('form-card');

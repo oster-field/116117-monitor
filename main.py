@@ -12,6 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import JobLookupError
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
@@ -239,4 +240,26 @@ async def health():
     return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
 
 
+# ── Legal pages and favicon ──────────────────────────────────────────────────
+
+@app.get("/impressum", include_in_schema=False)
+async def impressum_page():
+    return FileResponse("static/impressum.html")
+
+
+@app.get("/datenschutz", include_in_schema=False)
+async def datenschutz_page():
+    return FileResponse("static/datenschutz.html")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    # Fallback for clients that ignore <link rel="icon">; serves img/favicon.png.
+    if not os.path.isfile("img/favicon.png"):
+        raise HTTPException(404)
+    return FileResponse("img/favicon.png", media_type="image/png")
+
+
+# check_dir=False: the app must still start if img/ has not been created yet.
+app.mount("/img", StaticFiles(directory="img", check_dir=False), name="img")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
