@@ -9,8 +9,8 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", "Termin-Wächter <noreply@yourdomain.com>")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 
 
-def send_appointment_found(to_email: str, booking_url: str, result: str) -> None:
-    """Send notification email when an appointment is found."""
+def send_appointment_found(to_email: str, booking_url: str, result: str) -> bool:
+    """Send notification email when an appointment is found. True if sent."""
 
     html = f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -69,8 +69,114 @@ def send_appointment_found(to_email: str, booking_url: str, result: str) -> None
     try:
         resend.Emails.send(params)
         logger.info("Email sent to %s", to_email)
+        return True
     except Exception as exc:
         logger.error("Failed to send email to %s: %s", to_email, exc)
+        return False
+
+
+# Texts for the "monitoring ended" email. A booked code has no entry on
+# purpose: nothing is sent in that case.
+_COMPLETION_TEXTS = {
+    "expired": {
+        "subject": "Überwachung beendet: Vermittlungscode abgelaufen / Monitoring ended: code expired",
+        "title_de": "Vermittlungscode abgelaufen",
+        "title_en": "Referral code expired",
+        "body_de": (
+            "Laut 116117 ist der Vermittlungscode {vc} (PLZ {plz}) abgelaufen. "
+            "Damit kann kein Termin mehr gebucht werden. Bitte wenden Sie sich an die "
+            "ausstellende Praxis, um bei Bedarf einen neuen Code zu erhalten."
+        ),
+        "body_en": (
+            "According to 116117, the referral code {vc} (postal code {plz}) has expired "
+            "and can no longer be used to book an appointment. Please contact the practice "
+            "that issued it to get a new code if needed."
+        ),
+    },
+    "invalid_code": {
+        "subject": "Überwachung beendet: Vermittlungscode nicht erkannt / Monitoring ended: code not recognised",
+        "title_de": "Vermittlungscode nicht erkannt",
+        "title_en": "Referral code not recognised",
+        "body_de": (
+            "116117 hat den Vermittlungscode {vc} (PLZ {plz}) nicht erkannt. "
+            "Bitte prüfen Sie Code und PLZ und starten Sie die Überwachung bei Bedarf neu."
+        ),
+        "body_en": (
+            "116117 did not recognise the referral code {vc} (postal code {plz}). "
+            "Please check the code and postal code and start a new monitoring if needed."
+        ),
+    },
+}
+
+
+def send_job_completed(
+    to_email: str, vermittlungscode: str, plz: str, reason: str
+) -> bool:
+    """Tell the user that monitoring has ended and why; the admin gets a BCC.
+
+    reason: "expired" or "invalid_code". Returns True if the email was sent.
+    """
+    texts = _COMPLETION_TEXTS.get(reason)
+    if texts is None:
+        logger.error("No completion email text for reason %r", reason)
+        return False
+
+    body_de = texts["body_de"].format(vc=vermittlungscode, plz=plz)
+    body_en = texts["body_en"].format(vc=vermittlungscode, plz=plz)
+
+    html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                max-width: 520px; margin: 0 auto; padding: 2rem; background: #f8fafc;">
+
+      <div style="background: #fff; border-radius: 12px; padding: 2rem;
+                  border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,.06);">
+
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <div style="display: inline-block; background: #fef3c7; border-radius: 50%;
+                      width: 3.5rem; height: 3.5rem; line-height: 3.5rem;
+                      font-size: 1.75rem; text-align: center;">!</div>
+        </div>
+
+        <h1 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;
+                   text-align: center; margin: 0 0 .4rem;">
+          Überwachung beendet: {texts["title_de"]}
+        </h1>
+        <p style="text-align: center; color: #64748b; font-size: .875rem; margin: 0 0 1.75rem;">
+          Monitoring ended: {texts["title_en"]}
+        </p>
+
+        <p style="color: #334155; font-size: .9rem; line-height: 1.6; margin: 0 0 .5rem;">
+          {body_de}
+        </p>
+        <p style="color: #94a3b8; font-size: .8rem; font-style: italic; margin: 0 0 1.75rem;">
+          {body_en}
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.75rem 0 1rem;">
+        <p style="text-align: center; font-size: .72rem; color: #cbd5e1;">
+          Termin-Wächter · 116117 Terminservice · Psychiatrie &amp; Nervenheilkunde<br>
+          © 2026 Andrei Tregubov
+        </p>
+      </div>
+    </div>
+    """
+
+    params = {
+        "from":    FROM_EMAIL,
+        "to":      [to_email],
+        "subject": texts["subject"],
+        "html":    html,
+    }
+    if ADMIN_EMAIL:
+        params["bcc"] = [ADMIN_EMAIL]
+
+    try:
+        resend.Emails.send(params)
+        logger.info("Completion email (%s) sent to %s", reason, to_email)
+        return True
+    except Exception as exc:
+        logger.error("Failed to send completion email to %s: %s", to_email, exc)
+        return False
 
 
 def send_new_job_notification(email: str, vermittlungscode: str, plz: str) -> None:

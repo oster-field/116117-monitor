@@ -30,12 +30,93 @@ def build_url(vc: str, plz: str) -> str:
     )
 
 
+# Longest extra wait for a recognisable page, on top of the fixed render wait.
+EXTRA_WAIT_MS = 30_000
+
+# What a page can say. Matched case-insensitively on normalised text.
+_COUNT_RE = re.compile(r"(\d+)\s+TERMINE\s+IM\s+UMKREIS", re.IGNORECASE)
+_BOOKED_RE = re.compile(
+    r"Termin\s+bereits\s+gebucht|wurde\s+bereits\s+ein\s+Termin\s+gebucht",
+    re.IGNORECASE,
+)
+_EXPIRED_RE = re.compile(
+    r"Vermittlungscode\s+abgelaufen|kann\s+kein\s+Termin\s+mehr\s+gebucht\s+werden",
+    re.IGNORECASE,
+)
+# For an unknown code the site shows its generic start page (search form).
+_START_PAGE_MARKERS = ("suchgebiet (plz)", "vermittlungscode (optional)")
+
+# The same patterns evaluated in the browser, so the extra wait ends as soon
+# as one of the final states is on screen.
+_FINAL_STATE_PATTERNS = [r.pattern for r in (_COUNT_RE, _BOOKED_RE, _EXPIRED_RE)]
+_FINAL_STATE_JS = r"""(patterns) => {
+  const t = (document.body ? document.body.innerText : '')
+    .replace(/\u00ad/g, '').replace(/\s+/g, ' ');
+  return patterns.some(p => new RegExp(p, 'i').test(t));
+}"""
+
+
+def _normalize(text: str) -> str:
+    """Drop soft hyphens and collapse all whitespace."""
+    return re.sub(r"\s+", " ", text.replace("\u00ad", "")).strip()
+
+
+def _is_blocked(text: str) -> bool:
+    return "Access Denied" in text or "Forbidden" in text
+
+
+def _detect_final_state(flat: str, url: str) -> dict | None:
+    """found / not_found / booked / expired, or None if none of them is shown."""
+    m = _COUNT_RE.search(flat)
+    if m:
+        count = int(m.group(1))
+        if count == 0:
+            return {"status": "not_found", "count": 0}
+        return {"status": "found", "count": count, "url": url}
+    if _BOOKED_RE.search(flat):
+        return {"status": "booked"}
+    if _EXPIRED_RE.search(flat):
+        return {"status": "expired"}
+    return None
+
+
+def classify_page_text(text: str, url: str) -> dict:
+    """Map the visible page text to a result. Pure function, no I/O.
+
+    Anything not recognised with certainty is an "error", which keeps the
+    job running. "invalid_code" means the site showed its start page instead
+    of a result page.
+    """
+    if _is_blocked(text):
+        return {
+            "status": "error",
+            "message": "Zugriff verweigert (Access Denied). Server blockiert die Anfrage."
+        }
+
+    flat = _normalize(text)
+    final = _detect_final_state(flat, url)
+    if final is not None:
+        return final
+
+    low = flat.lower()
+    if all(marker in low for marker in _START_PAGE_MARKERS):
+        return {"status": "invalid_code"}
+
+    return {
+        "status": "error",
+        "message": "Seitenstruktur nicht erkannt. Bitte Vermittlungscode und PLZ prüfen."
+    }
+
+
 async def check_appointments(vc: str, plz: str) -> dict:
     """
     Returns one of:
-      {"status": "found",     "count": N, "url": "..."}
-      {"status": "not_found", "count": 0}
-      {"status": "error",     "message": "..."}
+      {"status": "found",        "count": N, "url": "..."}
+      {"status": "not_found",    "count": 0}
+      {"status": "booked"}        code was already used for a booking
+      {"status": "expired"}       code has expired
+      {"status": "invalid_code"}  site shows its start page (unknown code)
+      {"status": "error",        "message": "..."}
     """
     url = build_url(vc, plz)
     logger.info("Checking %s (headless=%s)", url, HEADLESS)
@@ -70,31 +151,39 @@ async def check_appointments(vc: str, plz: str) -> dict:
                 await page.wait_for_timeout(6_000)  # let JS render
 
                 text = await page.inner_text("body")
+
+                # Some states render slowly (an already booked code does).
+                # Only when nothing recognisable is on screen yet, keep waiting.
+                if not _is_blocked(text) and _detect_final_state(_normalize(text), url) is None:
+                    try:
+                        await page.wait_for_function(
+                            _FINAL_STATE_JS,
+                            arg=_FINAL_STATE_PATTERNS,
+                            timeout=EXTRA_WAIT_MS,
+                        )
+                    except PWTimeout:
+                        pass  # classify whatever is on screen
+                    text = await page.inner_text("body")
+                final_url = page.url
             finally:
                 await browser.close()
 
-        # — Parse result —
-        if "Access Denied" in text or "Forbidden" in text:
-            return {
-                "status": "error",
-                "message": "Zugriff verweigert (Access Denied). Server blockiert die Anfrage."
-            }
-
-        m = re.search(r"(\d+)\s+TERMINE\s+IM\s+UMKREIS", text, re.IGNORECASE)
-        if not m:
-            logger.warning("Cannot parse page. Snippet: %.300s", text)
-            return {
-                "status": "error",
-                "message": "Seitenstruktur nicht erkannt. Bitte Vermittlungscode und PLZ prüfen."
-            }
-
-        count = int(m.group(1))
-        if count == 0:
+        # Parse result
+        result = classify_page_text(text, url)
+        status = result["status"]
+        if status == "found":
+            logger.info("%d appointment(s) found!", result["count"])
+        elif status == "not_found":
             logger.info("0 appointments found")
-            return {"status": "not_found", "count": 0}
-
-        logger.info("%d appointment(s) found!", count)
-        return {"status": "found", "count": count, "url": url}
+        elif status == "booked":
+            logger.info("Code already booked")
+        elif status == "expired":
+            logger.info("Code expired")
+        elif status == "invalid_code":
+            logger.warning("Start page instead of results (final URL: %s)", final_url)
+        elif not _is_blocked(text):
+            logger.warning("Cannot parse page. Snippet: %.300s", text)
+        return result
 
     except PWTimeout:
         return {"status": "error", "message": "Zeitüberschreitung beim Laden der Seite (>60 s)."}
