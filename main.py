@@ -24,7 +24,7 @@ from database import (
 from scraper import check_appointments, build_url
 from email_sender import (
     send_appointment_found, send_new_job_notification, send_stuck_job_alert,
-    send_job_completed,
+    send_job_completed, send_monitoring_started,
 )
 
 logging.basicConfig(
@@ -309,6 +309,9 @@ async def start(req: StartRequest):
         _add_sched(job_id)
     await asyncio.to_thread(
         send_new_job_notification, req.email, req.vermittlungscode, req.plz,
+    )
+    await asyncio.to_thread(
+        send_monitoring_started, req.email, req.vermittlungscode, req.plz,
     )
     return {
         "job_id":          job_id,

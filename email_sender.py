@@ -75,6 +75,70 @@ def send_appointment_found(to_email: str, booking_url: str, result: str) -> bool
         return False
 
 
+def send_monitoring_started(to_email: str, vermittlungscode: str, plz: str) -> None:
+    """Confirm to a new user that monitoring has started. Sent once per
+    genuinely new job — main.py skips this for a duplicate /start request."""
+
+    html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                max-width: 520px; margin: 0 auto; padding: 2rem; background: #f8fafc;">
+
+      <div style="background: #fff; border-radius: 12px; padding: 2rem;
+                  border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,.06);">
+
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <div style="display: inline-block; background: #dbeafe; border-radius: 50%;
+                      width: 3.5rem; height: 3.5rem; line-height: 3.5rem;
+                      font-size: 1.75rem; text-align: center;">▶</div>
+        </div>
+
+        <h1 style="font-size: 1.3rem; font-weight: 700; color: #0f172a;
+                   text-align: center; margin: 0 0 .4rem;">
+          Überwachung gestartet
+        </h1>
+        <p style="text-align: center; color: #64748b; font-size: .875rem; margin: 0 0 1.75rem;">
+          Monitoring started
+        </p>
+
+        <p style="color: #334155; font-size: .9rem; line-height: 1.6; margin: 0 0 .5rem;">
+          Die Überwachung für Vermittlungscode <strong>{vermittlungscode}</strong> (PLZ {plz}) läuft jetzt.
+          Sobald ein Termin verfügbar ist, erhalten Sie eine E-Mail — bitte buchen Sie dann schnell,
+          freie Termine werden rasch vergeben. Verpassen Sie einen Termin, läuft die Überwachung
+          einfach weiter, bis Sie einen Termin buchen oder Ihr Vermittlungscode abläuft.
+          Bitte prüfen Sie bei Benachrichtigungen auch Ihren <strong>Spam-Ordner</strong>.
+        </p>
+        <p style="color: #94a3b8; font-size: .8rem; font-style: italic; margin: 0 0 1.75rem;">
+          Monitoring for referral code {vermittlungscode} (postal code {plz}) is now active.
+          You'll get an email as soon as a slot is available — please book quickly, as slots go fast.
+          If you miss one, monitoring simply continues until you book an appointment or your referral
+          code expires. Please also check your <strong>spam folder</strong> for notifications.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 1.75rem 0 1rem;">
+        <p style="text-align: center; font-size: .72rem; color: #cbd5e1;">
+          Termin-Wächter · 116117 Terminservice · Psychiatrie &amp; Nervenheilkunde<br>
+          © 2026 Andrei Tregubov
+        </p>
+      </div>
+    </div>
+    """
+
+    # No admin BCC here: send_new_job_notification already tells the admin
+    # about every new job in this same code path — a BCC would duplicate it.
+    params = {
+        "from":    FROM_EMAIL,
+        "to":      [to_email],
+        "subject": "Überwachung gestartet / Monitoring started",
+        "html":    html,
+    }
+
+    try:
+        resend.Emails.send(params)
+        logger.info("Start-confirmation sent to %s", to_email)
+    except Exception as exc:
+        logger.error("Failed to send start-confirmation to %s: %s", to_email, exc)
+
+
 # Texts for the "monitoring ended" email. A booked code has no entry on
 # purpose: nothing is sent in that case.
 _COMPLETION_TEXTS = {
