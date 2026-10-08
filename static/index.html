@@ -776,22 +776,36 @@ async function poll() {
 
     $('ts').textContent = fmtDate(d.last_checked);
 
-    if (d.status === 'found') {
+    if (d.status === 'completed') {
       clearTimeout(S.pollTimer);
       localStorage.removeItem('tw_job');
-      $('bklink').href = d.booking_url;
-      show('ban-ok');
-      return;
-    }
-    if (d.status === 'error') {
-      clearTimeout(S.pollTimer);
-      $('err-msg').innerHTML =
-        san(d.error_message || 'Unbekannter Fehler') +
-        '<br><em>An error occurred. Please restart monitoring.</em>';
+      if (d.reason === 'booked') {
+        // Code was already used elsewhere — nothing went wrong, nothing to show.
+        hide('ban-ok'); hide('ban-err'); hide('status-card');
+        resetBtn(); show('form-card');
+        return;
+      }
+      const texts = {
+        expired:      ['Vermittlungscode abgelaufen. Eine E-Mail wurde bereits verschickt.',
+                        'Referral code expired. An email has already been sent.'],
+        invalid_code: ['Vermittlungscode nicht erkannt. Eine E-Mail wurde bereits verschickt.',
+                        'Referral code not recognised. An email has already been sent.'],
+      };
+      const [de, en] = texts[d.reason] || ['Überwachung beendet.', 'Monitoring ended.'];
+      $('err-msg').innerHTML = de + '<br><em>' + en + '</em>';
       show('ban-err');
       return;
     }
-    // still running
+
+    // Still running. "found" is not final any more — a slot can appear,
+    // disappear, and reappear while the job keeps going, so mirror d.found
+    // on every poll instead of latching it once.
+    if (d.found) {
+      $('bklink').href = d.booking_url;
+      show('ban-ok');
+    } else {
+      hide('ban-ok');
+    }
     S.pollTimer = setTimeout(poll, 30_000);
 
   } catch {
